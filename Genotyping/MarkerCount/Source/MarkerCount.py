@@ -5,22 +5,23 @@ Created on August 31, 2021
 Han Rui (154702913@qq.com)
 
 @Usage
-> python3 MarkerCount.py <barcode.txt> <i_mut.table> <i_bam.dir> <i_fq.dir> <o_csv.dir>
-# <barcode.txt>: barcode sequence separated with '\n'
-# <i_mut.table>: table containing mutation info (CHROM, POS, REF)
-#                1. CHROM: contig of reference, usually equals to the number of chromosome
-#                2. POS: SNP position in chromosome
-#                3. REF: base character in reference genome
-# <i_bam.dir>: directory of bam
-# <i_fq.dir>: directory of fq
-# <o_csv.dir>: directory used to save result csv file for each site (Num, Frequency, UMI)
-#              1. Num: number of sample which has a record on the site
-#              2. Frequency: appearance probability of the mut base provided by user
+> python3 MarkerCount.py [bc.txt] [mut.tab] [bam.dir] [fq.dir] [o_csv.dir]
+# [bc.txt]: 8bp barcode sequences separated with '\n'
+# [mut.tab]: table containing mutation info (CHROM, POS, REF, ALT)
+#                1. CHROM: contig of reference
+#                2. POS: position of the first base in mutation identifier
+#                3. REF: bases in reference sequence
+#                4. ALT: mutant bases in reads
+# [bam.dir]: directory of bam
+# [fq.dir]: directory of fq
+# [o_csv.dir]: a directory used to save tmp csv (Num, Frequency, UMI)
+#              1. Num: number of sample which has a record at the site
+#              2. Frequency: fraction of the mutation in the position
 #              3. UMI: number of reads with unique UMI marker
 
 @Function
-1. Deduplicate UMI marker for each loci in bam file
-2. Allow user inputs mutation info with xlsx, txt or csv format file
+1. Deduplicate reads with same UMI marker for each loci
+2. Count mutant SNP and InDel frequency among reads for each loci
 """
 
 import os
@@ -31,42 +32,21 @@ import openpyxl as opx
 import pandas as pd
 import pysam
 
-barcode = sys.argv[1]
-mutFile = sys.argv[2]
-bamDir = sys.argv[3]
-fqDir = sys.argv[4]
-csvDir = sys.argv[5]
-
-# Definition of variable and function
-baseMap = {"A": 0, "C": 1, "G": 2, "T": 3}
-umiObj = re.compile("ATAGCGACGCGTTTCAAC([ACGT]{6})")
-mergeFrame = {}
-
-# Measure for sample number by barcodes
-sample = 0
-with open(barcode, 'r') as barcodeFile:
-    for bc in barcodeFile:
-        if bc.strip() == '':
-            continue
-        sample += 1
-
 
 def xlsx_reader(mut_file):
-    """
-    Iterate row array in mutation file
-    (read_only=True only allow rows attr but not columns attr)
+    """ Read mutation args by line from xlsx file.
 
     :param mut_file: str
-        file path of xlsx
+        xlsx path
 
-    :return: list
-        iterable and each element in array is str type
+    :return: 2d list
+        mutation matrix composed of strings
     """
     mut_mat = []
     mut_book = opx.load_workbook(mut_file, read_only=True)
     mut_sht = mut_book[mut_book.sheetnames[0]]
+    # read_only=True only allow rows attr but not columns attr
     mut_row = mut_sht.rows
-    # Iterate in generator
     next(mut_row)
     for row in mut_row:
         mut_arr = []
@@ -77,17 +57,16 @@ def xlsx_reader(mut_file):
 
 
 def text_reader(mut_file):
-    """
-    Iterate row array in mutation file
+    """ Read mutation args by line from text file.
 
     :param mut_file: str
-        file path of csv or txt(separate should be ',')
+        path of csv or txt (separator=',')
 
-    :return: list
-        iterable and each element in array is str type
+    :return: 2d list
+        mutation matrix composed of strings
     """
     mut_mat = []
-    mut_obj = open(mut_file, 'r')
+    mut_obj = open(mut_file)
     next(mut_obj)
     for x in mut_obj:
         mut_mat.append(x.strip().split(','))
@@ -95,9 +74,8 @@ def text_reader(mut_file):
     return mut_mat
 
 
-def seq_name(fq_1, fq_2):
-    """
-    Build mapping between serial name and its sequence for a PE fq
+def seq_roster(fq_1, fq_2):
+    """ Associate serial name and its sequence from PE fq files.
 
     :param fq_1: (str)
         sample_1.fq filepath
@@ -105,45 +83,39 @@ def seq_name(fq_1, fq_2):
         sample_2.fq filepath
 
     :return: (dict)
-        mapping for each reads serial name and its sequence
+        use serial name as key and its sequence as key value
     """
-    seq_alias = {}
     f_fq = open(fq_1)
     r_fq = open(fq_2)
-    f_row = '1'
-    r_row = '2'
+
+    # Init
+    roster = {}
     line = 1
-
-    while f_row and r_row:
-
+    while True:
         try:
-
             f_row = next(f_fq).strip()
             r_row = next(r_fq).strip()
 
-            # Focus on serial name
+            # Focus on identity line
             if (line + 3) % 4 == 0:
-
-                # PE index and seq pair initialize avoiding generate memory
-                pe_idx = 0
+                pair_idx = 0
                 seq_pair = []
 
-                # Update the pe_idx
+                # Search the identifier index in reverse
                 for letter in range(len(f_row) - 1, -1, -1):
                     if f_row[letter] == '1' and r_row[letter] == '2':
-                        pe_idx = letter
+                        pair_idx = letter
                         break
 
-                # Generate by next(generator)
+                # Add pair of sequences in next line
                 line += 1
-                # Update the seq_pair
                 seq_pair.append(next(f_fq).strip())
                 seq_pair.append(next(r_fq).strip())
 
-                # The key value should equal to query_name in bam
-                seq_alias[f_row[1: pe_idx - 1]] = seq_pair
+                # The query_name decided by identifier index
+                roster[f_row[1: pair_idx - 1]] = seq_pair
 
-            # Generate for next() in next cycle
+            # Lead to next cycle
             line += 1
 
         except StopIteration:
@@ -151,22 +123,83 @@ def seq_name(fq_1, fq_2):
 
     f_fq.close()
     r_fq.close()
+    return roster
 
-    return seq_alias
+
+def mut_locator(seg_seq, leader_pos, mut_len, pos_arr):
+    """ Locate the sequence in mutation area.
+
+    The return sequence can be Ref, Alt or any other seq. But only the Ref and
+    Alt will be used for calculate frequency (Freq = Alt / (Ref + Alt)) after
+    UMI deduplication.
+
+    :param seg_seq: str
+        segment sequence in bam
+    :param leader_pos: int
+        position index of the first base in the mutation identifier
+    :param mut_len: int
+        maximum length between Ref and Alt
+    :param pos_arr: tuple list
+        each binary tuple shows the binary position of current base that first
+        int element means reads position and second int element means reference
+        position
+
+    :return: str
+        mutation sequence in the given mutation length
+    """
+    # Locate the position of leader base
+    mut_leader = None
+    for pos in pos_arr:
+        if pos[0] is not None and pos[1] == leader_pos:
+            mut_leader = pos_arr.index(pos)
+            break
+    # Avoid invalid leader base (just in case)
+    if mut_leader is None:
+        return None
+
+    # Mutation sequence
+    mut_seq = ''
+    mut_arr = pos_arr[mut_leader: mut_leader + mut_len]
+    for mut in mut_arr:
+        if mut[0] is None:
+            continue
+        mut_seq += seg_seq[mut[0]]
+    return mut_seq
 
 
-# Build iterable object for 3 filetypes
+# Args
+barcode = sys.argv[1]
+mutFile = sys.argv[2]
+bamDir = sys.argv[3]
+fqDir = sys.argv[4]
+csvDir = sys.argv[5]
+
+# Definition of regex and variable
+UmiRegex = re.compile("ATAGCGACGCGTTTCAAC([ACGT]{6})")
+statePanel = {}
+
+""" Mutation matrix (n * 4)
+"""
 filetype = mutFile.split('.')[-1]
-mutation = []
+mutMat = []
+# TODO(154702913@qq.com): Add VCF format reader.
 if filetype.lower() not in ["xlsx", "csv", "txt"]:
     print("Invalid filetype")
 if filetype.lower() == "xlsx":
-    mutation = xlsx_reader(mutFile)
+    mutMat = xlsx_reader(mutFile)
 if filetype.lower() == "csv" or filetype.lower() == "txt":
-    mutation = text_reader(mutFile)
+    mutMat = text_reader(mutFile)
+
+# Measure sample number by barcodes
+sample = 0
+with open(barcode) as barcodeFile:
+    for bc in barcodeFile:
+        if bc.strip() == '':
+            continue
+        sample += 1
 
 for spl in range(sample):
-
+    # Load bam file
     bamObj = pysam.AlignmentFile(
         os.path.join(bamDir, str(spl) + ".sorted.bam"), 'rb'
     )
@@ -174,66 +207,73 @@ for spl in range(sample):
     if not bamObj.check_index():
         continue
 
-    # Sorted file for search
-    seqAlias = seq_name(
+    # Load fastq file
+    seqRoster = seq_roster(
         os.path.join(fqDir, str(spl) + "_1.fq"),
         os.path.join(fqDir, str(spl) + "_2.fq")
     )
 
-    for mutArr in mutation:
-
-        # Build dataframe
+    for mutArr in mutMat:
+        # Sequentially check each key of loci
         location = "_".join(mutArr)
-        if location not in mergeFrame.keys():
-            mergeFrame[location] = [[], [], []]
+        if location not in statePanel.keys():
+            statePanel[location] = [[], [], []]
 
-        # Fetch mutate positions in segment iterator
-        snp = int(mutArr[1])
-        segPile = bamObj.fetch(mutArr[0], snp - 1, snp)
-        umiPile = [[] for _ in 'ACGT']
+        # Mutation args
+        vcfPos = int(mutArr[1])
+        vcfRef = mutArr[2]
+        vcfAlt = mutArr[3]
+        mutLen = max(len(vcfRef), len(vcfAlt))
 
+        # UMI container (Ref and Alt)
+        umiPanel = [[], []]
+
+        # Fetch interval endpoints are not equal
+        segPile = bamObj.fetch(mutArr[0], vcfPos - 1, vcfPos + len(vcfRef))
         for seg in segPile:
-
-            # Search SNP base by position number array corresponding to sequence
-            refPos = seg.get_reference_positions()
-            if snp - 1 not in refPos:
+            """ Mutation sequence.
+            """
+            mutSeq = mut_locator(
+                seg.query_sequence, vcfPos - 1, mutLen, seg.get_aligned_pairs()
+            )
+            # Filter Ref or Alt sequence
+            if mutSeq != vcfRef and mutSeq != vcfAlt or mutSeq is None:
                 continue
-            # SNP
-            pos = [x[0] for x in seg.get_aligned_pairs() if snp - 1 == x[1]][0]
-            snpBase = seg.query_sequence[pos]
-            if snpBase == 'N':
-                continue
+            mutState = 0
+            if mutSeq == vcfAlt:
+                mutState = 1
 
-            # Name --> Seq(fq)
-            seqPair = seqAlias[seg.query_name]
+            """ UMI calling.
+            """
+            # Name --> Fq
+            seqPair = seqRoster[seg.query_name]
             fSeq = seqPair[0]
             rSeq = seqPair[1]
-
-            # Seq --> UMI
-            mergeUmi = umiObj.findall(fSeq) + umiObj.findall(rSeq)
-            if len(mergeUmi) != 1:
+            # Fq --> UMI
+            umiCase = UmiRegex.findall(fSeq) + UmiRegex.findall(rSeq)
+            if len(umiCase) != 1:
                 continue
-            umi = mergeUmi[0]
+            umi = umiCase[0]
 
             # SNP: UMI
-            if umi not in sum(umiPile, []):
-                umiPile[baseMap[snpBase]].append(umi)
+            if umi not in sum(umiPanel, []):
+                umiPanel[mutState].append(umi)
 
         # Frequency
-        umiSet = sum(umiPile, [])
-        if len(umiSet) == 0:
+        umiPool = sum(umiPanel, [])
+        if len(umiPool) == 0:
             continue
-        freq = len(umiPile[baseMap[mutArr[2]]]) / len(umiSet)
+        freq = len(umiPanel[1]) / len(umiPool)
 
         # Append to dataframe
-        mergeFrame[location][0].append(spl)
-        mergeFrame[location][1].append(freq)
-        mergeFrame[location][2].append(len(umiSet))
+        statePanel[location][0].append(spl)
+        statePanel[location][1].append(freq)
+        statePanel[location][2].append(len(umiPool))
 
-for loci in mergeFrame.keys():
+for loci in statePanel.keys():
     frame = pd.DataFrame({
-        "Num": mergeFrame[loci][0],
-        "Frequency": mergeFrame[loci][1],
-        "UMI": mergeFrame[loci][2]
+        "Num": statePanel[loci][0],
+        "Frequency": statePanel[loci][1],
+        "UMI": statePanel[loci][2]
     })
     frame.to_csv(os.path.join(csvDir, loci) + ".csv", index=False, sep=',')
