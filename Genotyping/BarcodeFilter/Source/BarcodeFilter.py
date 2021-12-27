@@ -5,10 +5,10 @@ Created on August 28, 2021
 Han Rui (154702913@qq.com)
 
 @Usage
-> python3 BarcodeFilter.py <i_barcode.txt> <i_1.fq> <i_2.fq> <o_fq.dir>
-# <i_barcode.txt>: file containing 8bp barcodes
-# <i_1.fq>: forward sequencing file
-# <i_2.fq>: reverse sequencing file
+> python3 BarcodeFilter.py <bc.txt> <n_1.fq> <n_2.fq> <o_fq.dir>
+# <bc.txt>: file containing 8bp barcodes
+# <n_1.fq>: forward sequencing file
+# <n_2.fq>: reverse sequencing file
 # <o_fq.dir>: directory for saving each pair of fq files
 
 @Function
@@ -17,29 +17,6 @@ Divide samples from sequencing files by barcode sequences
 
 import os
 import sys
-
-barcodeFile = open(sys.argv[1], 'r')
-barcode = [bc.strip() for bc in barcodeFile]
-barcodeFile.close()
-
-fFq = open(sys.argv[2], 'r')
-rFq = open(sys.argv[3], 'r')
-fqDir = sys.argv[4]
-
-# Definition of variables and functions
-fReads = []
-rReads = []
-fRow = '1'
-rRow = '2'
-sample = 0
-line = 0
-cache = 0
-emptySpl = list(range(len(barcode)))
-
-# For case count
-bothMatched = 0
-onceMatched = 0
-noneMatched = 0
 
 
 def num_case(f_row, r_row, line_ID):
@@ -81,10 +58,29 @@ def num_case(f_row, r_row, line_ID):
         return False
 
 
-while fRow and rRow:
+barcodeFile = open(sys.argv[1])
+barcode = [bc.strip() for bc in barcodeFile]
+barcodeFile.close()
 
+fFq = open(sys.argv[2])
+rFq = open(sys.argv[3])
+fqDir = sys.argv[4]
+
+# Definition of variables and functions
+fReads = []
+rReads = []
+sample = 0
+line = 0
+cache = 0
+emptySpl = list(range(len(barcode)))
+
+# For case count
+bothMatched = 0
+onceMatched = 0
+noneMatched = 0
+
+while True:
     try:
-
         # Iterate by row and touch exception
         fRow = next(fFq)
         rRow = next(rFq)

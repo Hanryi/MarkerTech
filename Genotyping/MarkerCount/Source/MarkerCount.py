@@ -5,16 +5,16 @@ Created on August 31, 2021
 Han Rui (154702913@qq.com)
 
 @Usage
-> python3 MarkerCount.py [bc.txt] [mut.tab] [bam.dir] [fq.dir] [o_csv.dir]
-# [bc.txt]: 8bp barcode sequences separated with '\n'
-# [mut.tab]: table containing mutation info (CHROM, POS, REF, ALT)
+> python3 MarkerCount.py <bc.txt> <mut.tab> <bam.dir> <fq.dir> <o_csv.dir>
+# <bc.txt>: 8bp barcode sequences separated with '\n'
+# <mut.tab>: table containing mutation info (CHROM, POS, REF, ALT)
 #                1. CHROM: contig of reference
 #                2. POS: position of the first base in mutation identifier
 #                3. REF: bases in reference sequence
 #                4. ALT: mutant bases in reads
-# [bam.dir]: directory of bam
-# [fq.dir]: directory of fq
-# [o_csv.dir]: a directory used to save tmp csv (Num, Frequency, UMI)
+# <bam.dir>: directory of bam
+# <fq.dir>: directory of fq
+# <o_csv.dir>: a directory used to save tmp csv (Num, Frequency, UMI)
 #              1. Num: number of sample which has a record at the site
 #              2. Frequency: fraction of the mutation in the position
 #              3. UMI: number of reads with unique UMI marker
@@ -169,6 +169,7 @@ def mut_locator(seg_seq, leader_pos, mut_len, pos_arr):
 
 # Args
 barcode = sys.argv[1]
+# TODO(154702913@qq.com): Allow overlap mutation site
 mutFile = sys.argv[2]
 bamDir = sys.argv[3]
 fqDir = sys.argv[4]
