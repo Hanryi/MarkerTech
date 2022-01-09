@@ -1,0 +1,8 @@
+openpyxl>=3.0.7
+XlsxWriter>=1.4.0
+seaborn
+numpy
+pandas
+matplotlib==3.4.3
+sklearn
+pysam==0.16.0.1
