@@ -1,8 +1,8 @@
 # Marker Tech
 
-[![platform](https://img.shields.io/badge/platform-Website-blue)](http://zeasystemsbio.hzau.edu.cn:8080/) [![copyright](https://img.shields.io/badge/copyright-LiLab-%23298850)](https://faculty.hzau.edu.cn/lilin12/zh_CN/index.htm) [![doc](https://img.shields.io/badge/doc-Manual-red)](https://github.com/9-34platform/MarkerTech/blob/master/Genotyping/基因分型开发文档.md) 
+[![platform](https://img.shields.io/badge/platform-Website-blue)](http://zeasystemsbio.hzau.edu.cn:8080/) [![copyright](https://img.shields.io/badge/copyright-LiLab-%23298850)](https://faculty.hzau.edu.cn/lilin12/zh_CN/index.htm) [![doc](https://img.shields.io/badge/doc-Primer-red)](https://github.com/9-34platform/MarkerTech/blob/master/PrimerDesigner/引物设计开发文档.md) [![doc](https://img.shields.io/static/v1?label=doc&message=iBP-Seq&color=red)](https://github.com/9-34platform/MarkerTech/blob/master/iBP-Seq/iBP-Seq 开发文档.md) 
 
-A cost-saving genotyping pattern based on the next-generation sequencing (NGS) technology. We also build an online analysis system which provides several services for using the technology in an easier way. However, in order to meet diverse and highly customized needs, the main source codes are provided for users to modify as needed. The services we provide include primer design service and sequence analysis service which can do both genotyping for improved Bulked-PCR Seq (iBP-Seq) and methylation typing. The primer design service generates special primer sequences flanking the maker for each template sequence. The NGS data for the sequence analysis service should be generate by using the primer design service. 
+A cost-saving genotyping pattern based on the next-generation sequencing (NGS) technology. We also build an online analysis system which provides several services for using the technology in an easier way. However, in order to meet diverse and highly customized needs, the main source codes are provided for users to modify as needed. The services we provide include primer design service and iBP-Seq (improved Bulked-PCR Seq) analysis service which can do both genotyping and methylation typing. The primer design service generates special primer sequences flanking the maker for each template sequence. The NGS data for the sequence analysis service should be generate by using the primer design service. 
 
 ## Preparation
 
@@ -14,7 +14,7 @@ A cost-saving genotyping pattern based on the next-generation sequencing (NGS) t
 3. **Data**
    - a template sequence file in fasta format containing template sequences (header format: \>Name|301-304; Sequence length>=601)
 
-### Sequence analysis
+### iBP-Seq analysis
 
 Due to the limitation of some modules, such as pysam, we recommend running these main codes on a Linux operating system when you call them from the command line. 
 
@@ -52,7 +52,7 @@ An example of the command line is as follows:
 python3 PrimerDesigner.py 3 testSeq.fa ./filename.xlsx 18 20 25 280 286 320 50 60 65
 ~~~
 
-### Sequence analysis
+### iBP-Seq analysis
 
 Some analysis steps will print message, you can use the command, such as `>> log 2>&1` , to save the printed message in a log file. 
 
@@ -67,7 +67,7 @@ fastp -i <filename_1>.fq -I <filename_2>.fq -o qc/clean_1.fq -O qc/clean_2.fq -j
 Divide the mixed sequencing data to several files by using the barcode file. The number of barcodes in the file decides the number of divided samples and the order of barcodes decides the number of each sample. 
 
 ~~~shell
-python3 BarcodeFilter.py barcode/<barcode>.txt qc/clean_1.fq qc/clean_2.fq fq
+python3 SeqPurifier.py barcode/<barcode>.txt qc/clean_1.fq qc/clean_2.fq fq
 ~~~
 
 #### Reference alignment
@@ -89,7 +89,7 @@ for b in $(ls bam/*); do samtools index ${b}; done
 Calculate each mutated marker frequency for each sample. 
 
 ~~~shell
-python3.7 <MarkerCount.py> barcode/<barcode>.txt mutation/<mut>.csv bam fq csv
+python3.7 AltFraction.py barcode/<barcode>.txt mutation/<mut>.csv bam fq csv
 ~~~
 
 #### KDE Cluster
@@ -97,7 +97,7 @@ python3.7 <MarkerCount.py> barcode/<barcode>.txt mutation/<mut>.csv bam fq csv
 Identify different genotypes or methylation types by the minimum point of kernel density estimation (KDE) from the sample population. 
 
 ~~~shell
-for t in $(ls csv/*); do python3.7 <Minima.py> ${t} xlsx png; done
+for t in $(ls csv/*); do python3.7 Minima.py ${t} xlsx png; done
 ~~~
 
 ## Copyright

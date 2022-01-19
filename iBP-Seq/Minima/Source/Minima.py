@@ -5,7 +5,7 @@ Created on April 22, 2021
 Han Rui (154702913@qq.com)
 
 @Usage
-> python3.x Minima_api.py <i_csv> <o_xlsx.dir> <o_png.dir>
+> python3 Minima.py <i_csv> <o_xlsx.dir> <o_png.dir>
 # <i_csv>: table containing frequency info (Num, Frequency, UMI)
 #          1. Num: number of sample which has a record on the site
 #          2. Frequency: appearance probability of the mut base provided by user

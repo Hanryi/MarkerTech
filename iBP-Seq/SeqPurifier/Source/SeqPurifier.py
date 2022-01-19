@@ -5,7 +5,7 @@ Created on August 28, 2021
 Han Rui (154702913@qq.com)
 
 @Usage
-> python3 BarcodeFilter.py <bc.txt> <n_1.fq> <n_2.fq> <o_fq.dir>
+> python3 PurifySeq.py <bc.txt> <n_1.fq> <n_2.fq> <o_fq.dir>
 # <bc.txt>: file containing 8bp barcodes
 # <n_1.fq>: forward sequencing file
 # <n_2.fq>: reverse sequencing file
