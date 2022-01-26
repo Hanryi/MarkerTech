@@ -58,16 +58,18 @@ Some analysis steps will print message, you can use the command, such as `>> log
 
 #### Quality control
 
+Filter out low quality and sequence length less than 72bp (2*20bp primer + 6bp UMI + 18Bbp bridge + 8bp barcode = 72bp) reads. 
+
 ~~~shell
-fastp -i <filename_1>.fq -I <filename_2>.fq -o qc/clean_1.fq -O qc/clean_2.fq -j qc/<filename>.json -h qc/<filename>.html
+fastp -i <filename_1>.fq -I <filename_2>.fq -o qc/clean_1.fq -O qc/clean_2.fq --length_required 72 -j qc/<filename>.json -h qc/<filename>.html
 ~~~
 
 #### Data division
 
-Divide the mixed sequencing data to several files by using the barcode file. The number of barcodes in the file decides the number of divided samples and the order of barcodes decides the number of each sample. 
+Divide the mixed sequencing data to several files by using the barcode file and build-in bridge sequence. The number of barcodes in the file decides the number of divided samples and the order of barcodes decides the number of each sample. Pair-end sequencing genome sequences are stored as pairs of fastq files in the fq directory and additional non-genomic sequences are stored as single fastq files in the umi directory. 
 
 ~~~shell
-python3 SeqPurifier.py barcode/<barcode>.txt qc/clean_1.fq qc/clean_2.fq fq
+python3 SeqPurifier.py barcode/<barcode>.txt qc/clean_1.fq qc/clean_2.fq fq umi
 ~~~
 
 #### Reference alignment
@@ -89,7 +91,7 @@ for b in $(ls bam/*); do samtools index ${b}; done
 Calculate each mutated marker frequency for each sample. 
 
 ~~~shell
-python3.7 AltFraction.py barcode/<barcode>.txt mutation/<mut>.csv bam fq csv
+python3.7 AltFraction.py barcode/<barcode>.txt mutation/<mut>.csv bam u csv
 ~~~
 
 #### KDE Cluster
