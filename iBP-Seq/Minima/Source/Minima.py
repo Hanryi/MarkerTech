@@ -33,10 +33,13 @@ o_dir_xlsx = sys.argv[2]
 o_dir_png = sys.argv[3]
 
 # Read as a row vector
-freq = pd.read_csv(i_csv, header=0, names=["Num", "Frequency", "UMI"])["Frequency"]
-freqArr = np.array(freq)
-step = freqArr.ptp()
+freqTab = pd.read_csv(i_csv, header=0, names=["Num", "Frequency", "UMI"])
+num = ['Num'] + [i for i in freqTab.Num]
+frequency = ['Frequency'] + [i for i in freqTab.Frequency]
 
+freqSeq = freqTab.Frequency
+freqArr = np.array(freqSeq)
+step = freqArr.ptp()
 # LOO of Cross-validation for best bandwidth of KDE
 grid = GridSearchCV(
     estimator=KernelDensity(kernel='gaussian'),
@@ -51,7 +54,7 @@ bandwidth_best *= step
 model = KernelDensity(bandwidth=bandwidth_best, kernel='gaussian')
 model.fit(freqArr.reshape(-1, 1))
 # X inputs and Y outputs
-freq_range = np.linspace(freq.min() - 1, freq.max() + 1, 1000)
+freq_range = np.linspace(freqSeq.min() - 1, freqSeq.max() + 1, 1000)
 freq_log_prob = model.score_samples(freq_range.reshape(-1, 1))
 freq_prob = np.exp(freq_log_prob)
 
@@ -110,23 +113,56 @@ plt.savefig(
 plt.close()
 
 # Genotype
-genotype = []
+genotype = ["Genotype"]
 xZone = [0] + xMini + [1]
-for i in freq:
+for i in freqSeq:
     n = 0
     for j in range(len(xZone) - 1):
         if xZone[j] <= i <= xZone[j + 1]:
             genotype.append(n)
         n += 1
-dataFrame = pd.DataFrame({
-    'Num': pd.read_csv(i_csv, header=0, names=["Num", "Frequency", "UMI"])["Num"],
-    'Frequency': freq,
-    'Genotype': genotype,
-})
+genotypeMat = [num, frequency, genotype]
+genotypeFrame = pd.DataFrame(genotypeMat).T
 # Xlsx
-dataFrame.to_excel(
-    os.path.join(
-        o_dir_xlsx, csvName + ".xlsx"
-    ),
-    index=False,
+genoTab = os.path.join(o_dir_xlsx, csvName + ".xlsx")
+sheetName = 'Genotype'
+frameWriter = pd.ExcelWriter(genoTab, engine='xlsxwriter')
+genotypeFrame.to_excel(
+    frameWriter, sheet_name=sheetName, header=False, index=False
 )
+
+""" Customize style.
+"""
+genotypeBook = frameWriter.book
+genotypeSheet = frameWriter.sheets[sheetName]
+headerStyle = genotypeBook.add_format({
+    'valign': 'vcenter',
+    'align': 'center',
+    'color': '#2f5b66',
+    # 'fg_color': '#F4B084',
+    'font_name': 'Times New Roman',
+    'bold':  True,
+    'text_wrap': True,
+})
+defaultCellStyle = genotypeBook.add_format({
+    'valign': 'vcenter',
+    'align': 'center',
+})
+# Set row style include header row
+genotypeSheet.set_row(0, 28, cell_format=headerStyle)
+for row in range(1, genotypeFrame.shape[0]):
+    genotypeSheet.set_row(row, 16)
+# Set column style
+genotypeSheet.set_column('A:C', cell_format=defaultCellStyle)
+# Most chars in each column
+charLen = [0 for _ in range(genotypeFrame.shape[1])]
+for column in range(genotypeFrame.shape[1]):
+    for sample in range(1, genotypeFrame.shape[0]):
+        if len(str(genotypeFrame[column][sample])) + 2 > charLen[column]:
+            charLen[column] = len(str(genotypeFrame[column][sample])) + 2
+# Set column width (pixel)
+genotypeSheet.set_column('A:A', max(6.64, charLen[0]))
+genotypeSheet.set_column('B:B', max(10.64, charLen[1]))
+genotypeSheet.set_column('C:C', max(9.64, charLen[2]))
+# Save as file
+frameWriter.save()

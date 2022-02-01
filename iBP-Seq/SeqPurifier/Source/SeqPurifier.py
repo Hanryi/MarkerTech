@@ -21,120 +21,186 @@ import os
 import sys
 
 
-def valid_tag(f_row, r_row, line_ID):
-    """ Judge the validity of current ID pair.
+class Read:
+    """ Sequencing Read class.
 
-    Valid ID should be judged by identifier which only allowed occur once as
-    "1"-"2" in F/R ID respectively.
-
-    :param f_row: (str)
-        forward reads ID
-    :param r_row: (str)
-        reverse reads ID
-    :param line_ID: (int)
-        line number of reads ID
-
-    :return: (bool)
+    This class has a fixed attribute named BRIDGE and has a class method named
+    sample_num(). After instantiate, each instance object has an init object
+    attribute named idLocation which can bind a value by object method named
+    and be called by the object method named fq_assign().
     """
-    # Case of unequal length
-    if len(f_row) != len(r_row):
-        print(f"Mismatched: unequal length in {line_ID} line "
-              f"({f_row}, {r_row})")
-        return False
+    BRIDGE = "ATAGCGACGCGTTTCAAC"
 
-    # Case of equal length
-    case = 0
-    identifier = 0
-    for letter in range(len(f_row)):
-        if f_row[letter] == '1' and r_row[letter] == '2':
-            identifier = letter
-            case += 1
-            continue
-        # Other mismatches
-        if f_row[letter] != r_row[letter]:
-            print(f"Mismatched: unequal letters in {line_ID} line "
-                  f"({f_row}, {r_row})")
+    def __init__(self):
+        self.idLocation = None
+
+    def valid_tag(self, f_id, r_id):
+        """ Judge the validity of current ID pair.
+
+        Valid ID should be judged by identifier which only allowed occur once as
+        "1"-"2" in F/R ID respectively.
+
+        :param f_id: (str)
+            forward reads ID
+        :param r_id: (str)
+            reverse reads ID
+
+        :return: (bool)
+        """
+        # Case of unequal length
+        if len(f_id) != len(r_id):
+            print(f"Mismatched: unequal length in {line} line")
             return False
 
-    # Valid ID
-    if case == 1:
-        return True
-    if case != 1:
-        print(f"Mismatched: 1-2 occurs {case} times in {line_ID} line "
-              f"({f_row}, {r_row})")
+        # Case of equal length
+        case = 0
+        identifier = 0
+        for letter in range(len(f_id)):
+            if f_id[letter] == '1' and r_id[letter] == '2':
+                identifier = letter
+                case += 1
+                continue
+            # Other mismatches
+            if f_id[letter] != r_id[letter]:
+                print(f"Mismatched: unequal letters in {line} line")
+                return False
+
+        # Valid ID
+        if case == 1:
+            # Bind the identifier to current class attribute
+            self.idLocation = identifier
+            return True
+        if case != 1:
+            print(f"Mismatched: 1-2 occurs {case} times in {line} line")
+            return False
+
+    def fq_assign(self, num, tag, f_read, r_read) -> None:
+        """ Split genome sequence and output 3 fastq files.
+
+        Assign umi and genome sequence from tagged read and another clean
+        genome sequence to three different fastq files in two directories.
+
+        :param num: (int)
+            number of current sample
+        :param tag: (int)
+            the value of tag is only 1 or 2, which represents the one of
+            Pair-End sequencing file with the equal file tag containing a
+            special barcode, bridge and UMI sequence.
+        :param f_read: (list)
+            contain 4 entries which are the 4 lines of forward read
+        :param r_read: (list)
+            contain 4 entries which are the 4 lines of reverse read
+
+        :return: None
+        """
+        # Check the equality of sequence and quality length
+        if not self.equal_seq(f_read) or not self.equal_seq(r_read):
+            return None
+
+        # Recognize tagged read by tag state
+        tag_read = [f_read, r_read][tag - 1]
+        cln_read = [f_read, r_read][2 - tag]
+        # Write the UMI sequence and clean sequence from tagged read to fastq
+        with open(fastq_file(fqDir, num, f"_{tag}.fq"), 'a') as fq_tag:
+            fq_tag.write('\n'.join([
+                tag_read[0], tag_read[1][8 + len(self.BRIDGE) + 6:],
+                tag_read[2], tag_read[3][8 + len(self.BRIDGE) + 6:]
+            ]) + '\n')
+        with open(fastq_file(umiDir, num, ".fq"), 'a') as fq_umi:
+            # Replace read ID with name
+            fq_umi.write('\n'.join([
+                tag_read[0][1: self.idLocation + 1],
+                tag_read[1][8 + len(self.BRIDGE): 8 + len(self.BRIDGE) + 6],
+                tag_read[2],
+                tag_read[3][8 + len(self.BRIDGE): 8 + len(self.BRIDGE) + 6]
+            ]) + '\n')
+        # Write another clean read to fastq
+        with open(fastq_file(fqDir, num, f"_{3 - tag}.fq"), 'a') as fq_cln:
+            fq_cln.write('\n'.join(cln_read) + '\n')
+        return None
+
+    @classmethod
+    def sample_num(cls, read_seq, tolerance=0):
+        """ Identify the number of sample by barcode sequence and bridge sequence.
+
+        Exact match for barcode and fuzzy match for bridge which allows at most one
+        different base in the same position.
+
+        :param read_seq: (str)
+            sequence in the second line of read
+        :param tolerance: (int, default=1)
+            Maximum fault tolerance of base in the specific sequence
+
+        :return:
+            number of sample or None
+        """
+        # Count for different base
+        bridge_seq = read_seq[8: 8 + len(cls.BRIDGE)]
+        difference = 0
+        for base in range(len(cls.BRIDGE)):
+            if bridge_seq[base] != cls.BRIDGE[base]:
+                difference += 1
+        # Identify special barcode within the allowed tolerance
+        bc_seq = read_seq[: 8]
+        if bc_seq in barcode and difference <= tolerance:
+            return barcode.index(bc_seq)
+        return None
+
+    @staticmethod
+    def equal_seq(single_read):
+        """ Check the equality of sequence and quality length.
+
+        :param single_read: (list)
+            contain 4 entries corresponding to the 4 lines of input read
+
+        :return: Ture or None
+        """
+        if len(single_read[1]) == len(single_read[3]):
+            return True
+        print(f"Error: quality does not correspond sequence {single_read[0]}")
         return False
 
 
-def sample_num(read_seq, tolerance=1):
-    """ Identify the number of sample by barcode sequence and bridge sequence.
+def fastq_file(fq_dir, num_prefix, suffix):
+    """ Build fastq filepath by input parameters.
 
-    Exact match for barcode and fuzzy match for bridge which allows at most one
-    different base in the same position.
+    :param fq_dir: (str)
+        a directory of fastq path
+    :param num_prefix: (int)
+        a sample number
+    :param suffix: (str)
+        pair-end file tag such as _1 or _2 and file format suffix, such as .fq
 
-    :param read_seq: (str)
-        sequence in the second line of read
-    :param tolerance: (int, default=1)
-        Maximum fault tolerance of base in the specific sequence
-
-    :return:
-        number of sample or None
+    :return: (str)
+        a relative path of fastq file with full filename
     """
-    # Count for different base
-    bridge_seq = read_seq[8: 8 + len(BRIDGE)]
-    difference = 0
-    for base in range(len(BRIDGE)):
-        if bridge_seq[base] != BRIDGE[base]:
-            difference += 1
-    # Identify special barcode within the allowed tolerance
-    bc_seq = read_seq[: 8]
-    if bc_seq in barcode and difference <= tolerance:
-        return barcode.index(bc_seq)
-    return None
+    return os.path.join(fq_dir, str(num_prefix) + suffix)
 
 
-def fq_assign(num, tag, f_read, r_read) -> None:
-    """ Split genome sequence and output 3 fastq files.
+def jump_iter(f_iter, r_iter, count, step=2):
+    """ Iterate over objects recursively.
 
-    Assign umi and genome sequence from tagged read and another clean genome
-    sequence to three different fastq files in two fixed directories.
+    :param f_iter: (object)
+        a forward iterable object
+    :param r_iter: (object)
+        a reverse iterable object
+    :param count: (int)
+        current line number
+    :param step: (int, default=2)
+        number of iterations
 
-    :param num: (int)
-        number of current sample
-    :param tag: (int)
-        the value of tag is only 1 or 2, which represents the one of Pair-End
-        sequencing file with the equal file tag containing a special barcode,
-        bridge and UMI sequence.
-    :param f_read: (List)
-        contain 4 entries corresponding to the 4 lines of current forward read
-    :param r_read: (List)
-        contain 4 entries corresponding to the 4 lines of current reverse read
-
-    :return: None
+    :return: (object)
+        recursive final two iterators and one changed count number
     """
-    # Check the equality of sequence and quality length
-    if len(f_read[1]) != len(f_read[3]) or len(r_read[1]) != len(r_read[3]):
-        print(f"Length Error: sequence in {line - 3} line and "
-              f"quality in {line - 1} line are not equal")
-        return None
+    next(f_iter)
+    next(r_iter)
 
-    # Recognize tagged read by tag state
-    tag_read = [f_read, r_read][tag - 1]
-    cln_read = [f_read, r_read][2 - tag]
-    # Write the UMI sequence and clean sequence from tagged read to fastq
-    with open(os.path.join(fqDir, str(num) + f"_{tag}.fq"), 'a') as fq_tag:
-        fq_tag.write('\n'.join([
-            tag_read[0], tag_read[1][8 + len(BRIDGE) + 6:],
-            tag_read[2], tag_read[3][8 + len(BRIDGE) + 6:]
-        ]) + '\n')
-    with open(os.path.join(umiDir, str(num) + ".fq"), 'a') as fq_umi:
-        fq_umi.write('\n'.join([
-            tag_read[0], tag_read[1][8 + len(BRIDGE): 8 + len(BRIDGE) + 6],
-            tag_read[2], tag_read[3][8 + len(BRIDGE): 8 + len(BRIDGE) + 6]
-        ]) + '\n')
-    # Write another clean read to fastq
-    with open(os.path.join(fqDir, str(num) + f"_{3 - tag}.fq"), 'a') as fq_cln:
-        fq_cln.write('\n'.join(cln_read) + '\n')
-    return None
+    count += 1
+    # Step by step
+    step -= 1
+    if step == 0:
+        return f_iter, r_iter, count
+    return jump_iter(f_iter, r_iter, count, step)
 
 
 barcodeFile = open(sys.argv[1])
@@ -154,7 +220,7 @@ sample = 0
 line = 0
 cache = 0
 emptySpl = list(range(len(barcode)))
-BRIDGE = "ATAGCGACGCGTTTCAAC"
+thisRead = None
 
 # For case count
 bothMatched = 0
@@ -169,30 +235,28 @@ while True:
         line += 1
 
         if (line + 3) % 4 == 0:
-            # Check if reads ID are valid
-            if not valid_tag(fRow, rRow, line):
-                continue
-
-            # Receive active cache state and turn off it after file writen
-            if cache > 0:
-                # Fastq output
-                fq_assign(sample, cache, fRead, rRead)
-
-                # Limited cache variables
-                cache = 0
+            # Limited cache variables
+            cache = 0
             fRead = []
             rRead = []
 
+            thisRead = Read()
+            # Check ID validity and bind identifier to the global object
+            if not thisRead.valid_tag(fRow, rRow):
+                continue
+
         # Sample special sequence identify
-        if (line + 2) % 4 == 0:
-            fCase = sample_num(fRow)
-            rCase = sample_num(rRow)
+        if (line + 2) % 4 == 0 and thisRead.idLocation is not None:
+            fCase = Read.sample_num(fRow)
+            rCase = Read.sample_num(rRow)
 
             if fCase is not None and rCase is not None:
                 bothMatched += 1
+                fFq, rFq, line = jump_iter(fFq, rFq, line)
                 continue
             if fCase is None and rCase is None:
                 noneMatched += 1
+                fFq, rFq, line = jump_iter(fFq, rFq, line)
                 continue
 
             # Single-ended matching
@@ -207,6 +271,10 @@ while True:
 
         fRead.append(fRow)
         rRead.append(rRow)
+
+        # Fastq output
+        if line % 4 == 0 and cache > 0:
+            thisRead.fq_assign(sample, cache, fRead, rRead)
 
     except StopIteration:
         break

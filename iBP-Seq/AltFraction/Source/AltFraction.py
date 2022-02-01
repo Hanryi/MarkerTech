@@ -5,15 +5,15 @@ Created on August 31, 2021
 Han Rui (154702913@qq.com)
 
 @Usage
-> python3 MarkerCount.py <bc.txt> <mut.tab> <bam.dir> <fq.dir> <o_csv.dir>
+> python3 AltFraction.py <bc.txt> <mut.tab> <bam.dir> <umi.dir> <o_csv.dir>
 # <bc.txt>: 8bp barcode sequences separated with '\n'
 # <mut.tab>: table containing mutation info (CHROM, POS, REF, ALT)
 #                1. CHROM: contig of reference
 #                2. POS: position of the first base in mutation identifier
 #                3. REF: bases in reference sequence
 #                4. ALT: mutant bases in reads
-# <bam.dir>: directory of bam
-# <fq.dir>: directory of fq
+# <bam.dir>: directory of bam files
+# <umi.dir>: directory of fq files containing umi sequence in fastq format
 # <o_csv.dir>: a directory used to save tmp csv (Num, Frequency, UMI)
 #              1. Num: number of sample which has a record at the site
 #              2. Frequency: fraction of the mutation in the position
@@ -25,7 +25,6 @@ Han Rui (154702913@qq.com)
 """
 
 import os
-import re
 import sys
 
 import openpyxl as opx
@@ -34,12 +33,12 @@ import pysam
 
 
 def xlsx_reader(mut_file):
-    """ Read mutation args by line from xlsx file.
+    """ Read mutation args by line from a xlsx file.
 
-    :param mut_file: str
-        xlsx path
+    :param mut_file: (str)
+        xlsx filepath
 
-    :return: 2d list
+    :return: (2d list)
         mutation matrix composed of strings
     """
     mut_mat = []
@@ -57,12 +56,12 @@ def xlsx_reader(mut_file):
 
 
 def text_reader(mut_file):
-    """ Read mutation args by line from text file.
+    """ Read mutation args by line from a text file.
 
-    :param mut_file: str
+    :param mut_file: (str)
         path of csv or txt (separator=',')
 
-    :return: 2d list
+    :return: (2d list)
         mutation matrix composed of strings
     """
     mut_mat = []
@@ -74,55 +73,36 @@ def text_reader(mut_file):
     return mut_mat
 
 
-def seq_roster(fq_1, fq_2):
-    """ Associate serial name and its sequence from PE fq files.
+def umi_roster(umi_fq):
+    """ Associate serial name and its UMI sequence from a fq file.
 
-    :param fq_1: (str)
-        sample_1.fq filepath
-    :param fq_2: (str)
-        sample_2.fq filepath
+    The key of dict is a substring which starts from the character behind '@'
+    to the character in two bases front of the pair-end sequencing file
+    identifier. The read IDs all are valid, read with invalid ID has been
+    filtered out before.
+
+    :param umi_fq: (str)
+        sample.fq filepath
 
     :return: (dict)
-        use serial name as key and its sequence as key value
+        a dict links serial name and its UMI sequence like {name: sequence,}
     """
-    f_fq = open(fq_1)
-    r_fq = open(fq_2)
-
-    # Init
     roster = {}
     line = 1
+
+    fq_obj = open(umi_fq)
     while True:
         try:
-            f_row = next(f_fq).strip()
-            r_row = next(r_fq).strip()
-
-            # Focus on identity line
+            fq_row = next(fq_obj).strip()
             if (line + 3) % 4 == 0:
-                pair_idx = 0
-                seq_pair = []
-
-                # Search the identifier index in reverse
-                for letter in range(len(f_row) - 1, -1, -1):
-                    if f_row[letter] == '1' and r_row[letter] == '2':
-                        pair_idx = letter
-                        break
-
-                # Add pair of sequences in next line
+                # Link read name and its sequence
+                roster[fq_row[: -2]] = next(fq_obj).strip()
                 line += 1
-                seq_pair.append(next(f_fq).strip())
-                seq_pair.append(next(r_fq).strip())
-
-                # The query_name decided by identifier index
-                roster[f_row[1: pair_idx - 1]] = seq_pair
-
-            # Lead to next cycle
             line += 1
 
         except StopIteration:
             break
-
-    f_fq.close()
-    r_fq.close()
+    fq_obj.close()
     return roster
 
 
@@ -133,18 +113,18 @@ def mut_locator(seg_seq, leader_pos, mut_len, pos_arr):
     Alt will be used for calculate frequency (Freq = Alt / (Ref + Alt)) after
     UMI deduplication.
 
-    :param seg_seq: str
+    :param seg_seq: (str)
         segment sequence in bam
-    :param leader_pos: int
+    :param leader_pos: (int)
         position index of the first base in the mutation identifier
-    :param mut_len: int
+    :param mut_len: (int)
         maximum length between Ref and Alt
-    :param pos_arr: tuple list
+    :param pos_arr: (tuple list)
         each binary tuple shows the binary position of current base that first
         int element means reads position and second int element means reference
         position
 
-    :return: str
+    :return: (str)
         mutation sequence in the given mutation length
     """
     # Locate the position of leader base
@@ -167,20 +147,15 @@ def mut_locator(seg_seq, leader_pos, mut_len, pos_arr):
     return mut_seq
 
 
-# Args
 barcode = sys.argv[1]
 # TODO(154702913@qq.com): Allow overlap mutation site
 mutFile = sys.argv[2]
 bamDir = sys.argv[3]
-fqDir = sys.argv[4]
+umiDir = sys.argv[4]
+# Output
 csvDir = sys.argv[5]
 
-# Definition of regex and variable
-UmiRegex = re.compile("ATAGCGACGCGTTTCAAC([ACGT]{6})")
-statePanel = {}
-
-""" Mutation matrix (n * 4)
-"""
+# Read mutation file as matrix
 filetype = mutFile.split('.')[-1]
 mutMat = []
 # TODO(154702913@qq.com): Add VCF format reader.
@@ -199,6 +174,7 @@ with open(barcode) as barcodeFile:
             continue
         sample += 1
 
+statePanel = {}
 for spl in range(sample):
     # Load bam file
     bamObj = pysam.AlignmentFile(
@@ -208,12 +184,8 @@ for spl in range(sample):
     if not bamObj.check_index():
         continue
 
-    # Load fastq file
-    seqRoster = seq_roster(
-        os.path.join(fqDir, str(spl) + "_1.fq"),
-        os.path.join(fqDir, str(spl) + "_2.fq")
-    )
-
+    # Load UMI fastq file
+    seqRoster = umi_roster(os.path.join(umiDir, str(spl) + ".fq"))
     for mutArr in mutMat:
         # Sequentially check each key of loci
         location = "_".join(mutArr)
@@ -225,14 +197,13 @@ for spl in range(sample):
         vcfRef = mutArr[2]
         vcfAlt = mutArr[3]
         mutLen = max(len(vcfRef), len(vcfAlt))
-
         # UMI container (Ref and Alt)
         umiPanel = [[], []]
 
         # Fetch interval endpoints are not equal
         segPile = bamObj.fetch(mutArr[0], vcfPos - 1, vcfPos + len(vcfRef))
         for seg in segPile:
-            """ Mutation sequence.
+            """ Mutation state.
             """
             mutSeq = mut_locator(
                 seg.query_sequence, vcfPos - 1, mutLen, seg.get_aligned_pairs()
@@ -244,21 +215,11 @@ for spl in range(sample):
             if mutSeq == vcfAlt:
                 mutState = 1
 
-            """ UMI calling.
+            """ UMI deduplication.
             """
-            # Name --> Fq
-            seqPair = seqRoster[seg.query_name]
-            fSeq = seqPair[0]
-            rSeq = seqPair[1]
-            # Fq --> UMI
-            umiCase = UmiRegex.findall(fSeq) + UmiRegex.findall(rSeq)
-            if len(umiCase) != 1:
-                continue
-            umi = umiCase[0]
-
-            # SNP: UMI
-            if umi not in sum(umiPanel, []):
-                umiPanel[mutState].append(umi)
+            umiSeq = seqRoster[seg.query_name]
+            if umiSeq not in sum(umiPanel, []):
+                umiPanel[mutState].append(umiSeq)
 
         # Frequency
         umiPool = sum(umiPanel, [])
