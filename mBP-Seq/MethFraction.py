@@ -8,15 +8,18 @@ Han Rui (154702913@qq.com)
 > python3 MethFraction.py <umi.fq> <m.bam> <m.tab> <o_m.csv>
 # <umi.fq>: fastq file of fastq
 # <m.bam>: a binary file after <m_1/2.fq> aligned to reference genome
-# <m.tab>: a table file containing methylation info (e.g. chr, pos, context)
-#          1. chr: chromosome name
-#          2. pos: methylation position
-#          3. context: methylation type
-# <o_m.csv>: a table file (Chr, Pos, Context, Active)
+# <m.tab>: a table file containing methylation info, Contains at least the
+#          following items:
+#          1. chr (col_0): chromosome name
+#          2. pos (col_1): methylation position
+#          3. context (col_3): methylation type
+# <o_m.csv>: a table file (Chr, Pos, Context, C, T, Active)
 #            1. Chr: chromosome name
 #            2. Pos: methylation position
 #            3. Context: methylation type
-#            4. Active: active fraction
+#            4. C: unique cytosine
+#            5. T: unique thymine
+#            6. Active: active fraction
 
 @Function
 Calculate active fraction for each methylation site after UMI deduplication
@@ -133,7 +136,7 @@ triple = generate_triple(sys.argv[3])
 
 # Output arg
 separator = ","
-header = ["Chr", "Pos", "Context", "Active"]
+header = ["Chr", "Pos", "Context", "C", "T", "Active"]
 with open(sys.argv[4], 'w') as methActiveTab:
     methActiveTab.write(separator.join(header) + "\n")
 
@@ -168,7 +171,9 @@ while True:
         active = len(umiPanel[0]) / len(umiPool)
 
         # Real-time output
-        methTriple.append(str(active))
+        methTriple += list(
+            map(str, [len(umiPanel[0]), len(umiPanel[1]), active])
+        )
         with open(sys.argv[4], 'a') as methActiveTab:
             methActiveTab.write(separator.join(methTriple) + "\n")
     except StopIteration:
