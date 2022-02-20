@@ -58,10 +58,10 @@ Some analysis steps will print message, you can use the command, such as `>> log
 
 #### Quality control
 
-Filter out low quality and sequence length less than 72bp (2*20bp primer + 6bp UMI + 18Bbp bridge + 8bp barcode = 72bp) reads. 
+Filter out low quality (lower than 20) and sequence length less than 72bp (2*20bp primer + 6bp UMI + 18Bbp bridge + 8bp barcode = 72bp) reads. 
 
 ~~~shell
-fastp -i <filename_1>.fq -I <filename_2>.fq -o qc/clean_1.fq -O qc/clean_2.fq --length_required 72 -j qc/<filename>.json -h qc/<filename>.html
+fastp -i <filename_1>.fq -I <filename_2>.fq -o qc/clean_1.fq -O qc/clean_2.fq -q 20 --length_required 72 -j qc/<filename>.json -h qc/<filename>.html
 ~~~
 
 #### Data division

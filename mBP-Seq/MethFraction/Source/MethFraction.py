@@ -13,12 +13,12 @@ Han Rui (154702913@qq.com)
 #          1. chr (col_0): chromosome name
 #          2. pos (col_1): methylation position
 #          3. context (col_3): methylation type
-# <o_m.csv>: a table file (Chr, Pos, Context, C, T, Active)
+# <o_m.csv>: a table file (Chr, Pos, Context, C, C+T, Active)
 #            1. Chr: chromosome name
 #            2. Pos: methylation position
 #            3. Context: methylation type
 #            4. C: unique cytosine
-#            5. T: unique thymine
+#            5. C+T: sum of unique thymine and cytosine
 #            6. Active: active fraction
 
 @Function
@@ -136,7 +136,7 @@ triple = generate_triple(sys.argv[3])
 
 # Output arg
 separator = ","
-header = ["Chr", "Pos", "Context", "C", "T", "Active"]
+header = ["Chr", "Pos", "Context", "C", "C+T", "Active"]
 with open(sys.argv[4], 'w') as methActiveTab:
     methActiveTab.write(separator.join(header) + "\n")
 
@@ -172,7 +172,7 @@ while True:
 
         # Real-time output
         methTriple += list(
-            map(str, [len(umiPanel[0]), len(umiPanel[1]), active])
+            map(str, [len(umiPanel[0]), len(umiPool), active])
         )
         with open(sys.argv[4], 'a') as methActiveTab:
             methActiveTab.write(separator.join(methTriple) + "\n")
