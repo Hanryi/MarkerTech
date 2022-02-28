@@ -121,10 +121,11 @@ class Read:
 
     @classmethod
     def sample_num(cls, read_seq, tolerance=0):
-        """ Identify the number of sample by barcode sequence and bridge sequence.
+        """ Identify the number of sample by barcode, bridge and UMI sequence.
 
         Exact match for barcode and fuzzy match for bridge which allows at most one
-        different base in the same position.
+        different base in the same position. Moreover, "N" (unknown base in
+        sequencing) is not allowed in UMI sequence.
 
         :param read_seq: (str)
             sequence in the second line of read
@@ -140,9 +141,12 @@ class Read:
         for base in range(len(cls.BRIDGE)):
             if bridge_seq[base] != cls.BRIDGE[base]:
                 difference += 1
-        # Identify special barcode within the allowed tolerance
+        # Multiple sequence verification
         bc_seq = read_seq[: 8]
-        if bc_seq in barcode and difference <= tolerance:
+        umi_seq = read_seq[8 + len(cls.BRIDGE): 8 + len(cls.BRIDGE) + 6]
+        multi_factor = difference <= tolerance and umi_seq.count("N") <= 0
+        # Identify special barcode within the allowed conditions
+        if bc_seq in barcode and multi_factor is True:
             return barcode.index(bc_seq)
         return None
 

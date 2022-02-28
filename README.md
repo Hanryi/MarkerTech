@@ -91,7 +91,7 @@ for b in $(ls bam/*); do samtools index ${b}; done
 Calculate each mutated marker frequency for each sample. 
 
 ~~~shell
-python3.7 AltFraction.py barcode/<barcode>.txt mutation/<mut>.csv bam u csv
+python3.7 AltFraction.py barcode/<barcode>.txt mutation/<mut>.csv bam umi csv
 ~~~
 
 #### KDE Cluster
