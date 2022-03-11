@@ -35,76 +35,100 @@ import pysam
 class MutMatrix:
     """ Mutation Matrix class.
 
-    This class mainly provide a method to update mutation matrix which deals
-    with multi-mutation sites. In addition to updating the information matrix,
-    update_matrix() method also dynamically created class attributes for each
-    pair of multi-mutation sites.
+    This class mainly provide a method for external calls to update mutation
+    matrix which deals with multi-mutation sites.
     """
     def __init__(self, mut_file: str):
         self.path = mut_file
         self.type = mut_file.split('.')[-1].lower()
-        self.overlapVec = set()
 
-    def sort_mutation(self):
-        """ Sort matrix by str of first col and int value of second col.
+    def update_mutation(self):
+        """ Update each matrix in tensor and merge into a matrix.
 
         :return: (2d list)
-            sorted matrix
+            updated mutation matrix
         """
-        raw_matrix = []
-        # TODO(154702913@qq.com): Add VCF format reader.
+        update_mat = []
+        chr_tensor = self.sort_mutation()
+        for mat in chr_tensor:
+            update_mat += self.update_sub_matrix(mat)
+        return update_mat
+
+    def sort_mutation(self):
+        """ Divide sorted matrix into tensor by chromosome names.
+
+        :return: (3d list)
+            sorted tensor
+        """
+        mut_matrix = []
         if self.type not in ["csv", "txt", "xlsx"]:
             print("Invalid filetype")
         if self.type == "xlsx":
-            raw_matrix = self.xlsx_reader()
+            mut_matrix = self.xlsx_reader()
         if self.type == "csv" or self.type == "txt":
-            raw_matrix = self.text_reader()
-        return sorted(raw_matrix, key=lambda info: (info[0], eval(info[1])))
+            mut_matrix = self.text_reader()
+        # Sort raw matrix
+        mut_matrix.sort(key=lambda info: (info[0], eval(info[1])))
 
-    def update_matrix(self):
-        """ Merge possible overlapping sites.
+        # Divide matrix into tensor by chromosome names
+        chr_tensor = []
+        chr_name = ""
+        for vec in mut_matrix:
+            # Divide list regions
+            if vec[0] != chr_name:
+                chr_name = vec[0]
+                chr_tensor.append([])
+                setattr(self, "overlap_" + chr_name, set())
+            chr_tensor[-1].append(vec)
+        return chr_tensor
 
-        This class method scan the overlapping sites. For each pair of them,
-        the object attribute named self.overlapVec save their row index for
-        skipping them in subsequent iterations. Moreover, for each merged
-        vector, the REF and ALT sequence are been updated and the length of
-        union sequence is also been add to a new attribute which is dynamically
-        created.
+    def update_sub_matrix(self, sorted_mat):
+        """ Merge possible overlapping sites in a sorted sub_matrix.
+
+        This class method scan the overlapping sites, update the REF and ALT
+        sequence and set the following attributes:
+        ---------
+        self.overlap_<chr>: save row index avoiding use them again. (update)
+        self."_".join(<vec>): length of union sequence. (dynamically created)
+        ---------
 
         :return: (2d list)
             updated matrix, each row output a frequency table
         """
+        # No double mutation
+        if len(sorted_mat) == 1:
+            return sorted_mat
+
+        chr_attr = "overlap_" + sorted_mat[0][0]
         update_mat = []
-        sorted_mat = self.sort_mutation()
         for i in range(len(sorted_mat) - 1):
             mut_size = len(sorted_mat[i][2])
             # Scan overlapped mutation sites
             if eval(sorted_mat[i][1]) + mut_size >= eval(sorted_mat[i + 1][1]):
-
                 # Add overlapped index to set
-                self.overlapVec = self.overlapVec | {i, i + 1}
-
+                setattr(
+                    self, chr_attr,
+                    getattr(self, chr_attr) | {i, i + 1}
+                )
                 union = self.merge_seq(
                     sorted_mat[i][2], sorted_mat[i + 1][2],
                     eval(sorted_mat[i][1]), eval(sorted_mat[i + 1][1])
                 )
+                head_len = eval(sorted_mat[i + 1][1]) - eval(sorted_mat[i][1])
                 merge_vec = [
                     sorted_mat[i][0], sorted_mat[i][1],
-                    sorted_mat[i][3] + self.tail_seq(
-                        union, sorted_mat[i][2]
-                    ),
-                    self.head_seq(
-                        union, sorted_mat[i + 1][2]
-                    ) + sorted_mat[i + 1][3]
+                    sorted_mat[i][3] + union[len(sorted_mat[i][2]):],
+                    union[: head_len] + sorted_mat[i + 1][3] +
+                    union[head_len + len(sorted_mat[i + 1][2]):]
                 ]
                 # Update mutation vector and add attribute
                 update_mat.append(merge_vec)
                 setattr(self, "_".join(merge_vec), len(union))
 
-            if i not in self.overlapVec:
+            if i not in getattr(self, chr_attr):
                 update_mat.append(sorted_mat[i])
         # Update the last mutation vector
-        if len(sorted_mat) - 1 not in self.overlapVec:
+        if len(sorted_mat) - 1 not in getattr(self, chr_attr):
             update_mat.append(sorted_mat[-1])
         return update_mat
 
@@ -125,15 +149,10 @@ class MutMatrix:
         :return: (str)
             merged sequence
         """
-        return seq_1 + seq_2[len(seq_1) - (pos_2 - pos_1):]
-
-    @staticmethod
-    def head_seq(union_seq, seq_2):
-        return union_seq[: len(union_seq) - len(seq_2)]
-
-    @staticmethod
-    def tail_seq(union_seq, seq_1):
-        return union_seq[len(seq_1):]
+        if pos_1 + len(seq_1) >= pos_2 + len(seq_2):
+            return seq_1
+        if pos_1 + len(seq_1) < pos_2 + len(seq_2):
+            return seq_1[: pos_2 - pos_1] + seq_2
 
     def xlsx_reader(self):
         """ Read mutation args by line from a xlsx file.
@@ -225,17 +244,17 @@ def mut_locator(seg_seq, leader_pos, mut_len, pos_arr):
     """
     # Locate the position of leader base
     mut_leader = None
+    mut_follow = None
     for pos in pos_arr:
         if pos[0] is not None and pos[1] == leader_pos:
             mut_leader = pos_arr.index(pos)
+        if pos[0] is not None and pos[1] == leader_pos + mut_len:
+            mut_follow = pos_arr.index(pos)
             break
-    # Avoid invalid leader base (just in case)
-    if mut_leader is None:
-        return None
 
     # Mutation sequence
     mut_seq = ''
-    mut_arr = pos_arr[mut_leader: mut_leader + mut_len]
+    mut_arr = pos_arr[mut_leader: mut_follow]
     for mut in mut_arr:
         if mut[0] is None:
             continue
@@ -252,7 +271,7 @@ csvDir = sys.argv[5]
 
 mutObj = MutMatrix(mutFile)
 # Read mutation table as updated matrix
-mutMat = mutObj.update_matrix()
+mutMat = mutObj.update_mutation()
 
 # Measure sample number by barcodes
 sample = 0
