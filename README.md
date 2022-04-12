@@ -33,12 +33,27 @@ Both the genotyping service for iBP-Seq and methylation typing service require t
    - fastp>=0.21.0
    - bwa>=0.7.17
    - samtools>=1.12
-   
 3. **Data**
    - a pair of paired-end sequencing data in fastq format
    - a barcode file which order is consistent with the actual order of use (separator='\n')
    - a mutation table with header include four columns (CHROM, POS, REF, ALT)
    - **optional**: a reference sequence file in fasta format 
+
+### mBP-Seq analysis
+
+1. **Environment**
+   - python>=3.6.0
+     - openpyxl>=3.0.7
+     - XlsxWriter>=1.4.0
+     - seaborn
+     - numpy
+     - pandas
+     - matplotlib==3.4.3
+     - sklearn
+     - pysam==0.16.0.1
+   - fastp>=0.21.0
+   - bsmark>=0.23.1
+   - samtools>=1.12
 
 ## Usage
 
@@ -66,10 +81,10 @@ fastp -i <filename_1>.fq -I <filename_2>.fq -o qc/clean_1.fq -O qc/clean_2.fq -q
 
 #### Data division
 
-Divide the mixed sequencing data to several files by using the barcode file and build-in bridge sequence. The number of barcodes in the file decides the number of divided samples and the order of barcodes decides the number of each sample. Pair-end sequencing genome sequences are stored as pairs of fastq files in the fq directory and additional non-genomic sequences are stored as single fastq files in the umi directory. 
+Divide the mixed sequencing data to several files by using the barcode file and build-in bridge sequence (selected by the first parameter). The number of barcodes in the file decides the number of divided samples and the order of barcodes decides the number of each sample. Pair-end sequencing genome sequences are stored as pairs of fastq files in the fq directory and additional non-genomic sequences are stored as single fastq files in the umi directory. 
 
 ~~~shell
-python3 SeqPurifier.py barcode/<barcode>.txt qc/clean_1.fq qc/clean_2.fq fq umi
+python3 SeqPurifier.py iBP barcode/<barcode>.txt qc/clean_1.fq qc/clean_2.fq fq umi
 ~~~
 
 #### Reference alignment
@@ -101,6 +116,28 @@ Identify different genotypes or methylation types by the minimum point of kernel
 ~~~shell
 for t in $(ls csv/*); do python3.7 Minima.py ${t} xlsx png; done
 ~~~
+
+### mBP-Seq analysis
+
+This pipeline is an application of iBP-Seq method in processing methylation data. 
+
+#### Quality control
+
+Apply the same standard as iBP-Seq. 
+
+~~~shell
+fastp -i <filename_1>.fq -I <filename_2>.fq -o qc/clean_1.fq -O qc/clean_2.fq -q 20 --length_required 72 -j qc/<filename>.json -h qc/<filename>.html
+~~~
+
+#### Data division
+
+The command line differs only on the first argument. 
+
+~~~shell
+python3 SeqPurifier.py mBP barcode/<barcode>.txt qc/clean_1.fq qc/clean_2.fq fq umi
+~~~
+
+
 
 ## Copyright
 

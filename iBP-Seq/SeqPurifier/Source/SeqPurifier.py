@@ -5,10 +5,11 @@ Created on August 28, 2021
 Han Rui (154702913@qq.com)
 
 @Usage
-> python3 SeqPurifier.py <bc.txt> <cln_1.fq> <cln_2.fq> <o_fq.dir> <o_umi.dir>
+> python3 SeqPurifier.py <*BP> <bc.txt> <_1.fq> <_2.fq> <o_fq.dir> <o_umi.dir>
+# <*BP>: a string option (mBP or iBP)
 # <bc.txt>: file containing 8bp barcodes
-# <cln_1.fq>: clean data of forward sequencing
-# <cln_2.fq>: clean data of reverse sequencing
+# <_1.fq>: clean data of forward sequencing
+# <_2.fq>: clean data of reverse sequencing
 # <o_fq.dir>: directory for storing pair of fq which removed additional seq
 # <o_umi.dir>: directory for storing fq which contains only UMI fragments
 
@@ -24,12 +25,14 @@ import sys
 class Read:
     """ Sequencing Read class.
 
-    This class has a fixed attribute named BRIDGE and has a class method named
-    sample_num(). After instantiate, each instance object has an init object
+    This class has a variable attribute named BRIDGE and has a class method
+    named sample_num(). After instantiate, each object has an init object
     attribute named idLocation which can bind a value by object method named
     and be called by the object method named fq_assign().
     """
-    BRIDGE = "ATAGCGACGCGTTTCAAC"
+    iBRIDGE = "ATAGCGACGCGTTTCAAC"
+    mBRIDGE = "ATAGCGACG"
+    BRIDGE = [iBRIDGE, mBRIDGE][["iBP", "mBP"].index(sys.argv[1])]
 
     def __init__(self):
         self.idLocation = None
@@ -207,15 +210,15 @@ def jump_iter(f_iter, r_iter, count, step=2):
     return jump_iter(f_iter, r_iter, count, step)
 
 
-barcodeFile = open(sys.argv[1])
+barcodeFile = open(sys.argv[2])
 barcode = [bc.strip() for bc in barcodeFile]
 barcodeFile.close()
 
-fFq = open(sys.argv[2])
-rFq = open(sys.argv[3])
+fFq = open(sys.argv[3])
+rFq = open(sys.argv[4])
 # Output
-fqDir = sys.argv[4]
-umiDir = sys.argv[5]
+fqDir = sys.argv[5]
+umiDir = sys.argv[6]
 
 # Init
 fRead = []
