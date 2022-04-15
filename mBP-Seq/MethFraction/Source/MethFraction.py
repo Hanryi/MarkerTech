@@ -160,7 +160,7 @@ while True:
                 mutState = 1
 
             # UMI deduplication
-            umiSeq = seqRoster[seg.query_name]
+            umiSeq = seqRoster[seg.query_name.split('_')[0]]
             if umiSeq not in sum(umiPanel, []):
                 umiPanel[mutState].append(umiSeq)
 

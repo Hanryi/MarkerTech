@@ -5,19 +5,21 @@ Created on August 31, 2021
 Han Rui (154702913@qq.com)
 
 @Usage
-> python3 AltFraction.py <bc.txt> <mut.tab> <bam.dir> <umi.dir> <o_csv.dir>
+> python3 AltFraction.py [*BP] <bc.txt> <mut.tab> <bam.d> <umi.d> <o_csv.d>
+# [*BP]: a string option (BP or iBP)
 # <bc.txt>: 8bp barcode sequences separated with '\n'
 # <mut.tab>: table containing mutation info (CHROM, POS, REF, ALT)
 #                1. CHROM: contig of reference
 #                2. POS: position of the first base in mutation identifier
 #                3. REF: bases in reference sequence
 #                4. ALT: mutant bases in reads
-# <bam.dir>: directory of bam files
-# <umi.dir>: directory of fq files containing umi sequence in fastq format
-# <o_csv.dir>: a directory used to save tmp csv (Num, Frequency, UMI)
-#              1. Num: number of sample which has a record at the site
-#              2. Frequency: fraction of the mutation in the position
-#              3. UMI: number of reads with unique UMI marker
+# <bam.d>: directory of bam files
+# <umi.d>: (optional)
+#          directory of fq files containing umi sequence in fastq format
+# <o_csv.d>: a directory used to save tmp csv (Num, Frequency, UMI)
+#            1. Num: number of sample which has a record at the site
+#            2. Frequency: fraction of the mutation in the position
+#            3. UMI: number of reads with unique UMI marker
 
 @Function
 1. Deduplicate reads with same UMI marker for each loci
@@ -49,12 +51,12 @@ class MutMatrix:
             updated mutation matrix
         """
         update_mat = []
-        chr_tensor = self.sort_mutation()
+        chr_tensor = self.sort_mut_tensor()
         for mat in chr_tensor:
             update_mat += self.update_sub_matrix(mat)
         return update_mat
 
-    def sort_mutation(self):
+    def sort_mut_tensor(self):
         """ Divide sorted matrix into tensor by chromosome names.
 
         :return: (3d list)
@@ -262,12 +264,15 @@ def mut_locator(seg_seq, leader_pos, mut_len, pos_arr):
     return mut_seq
 
 
-barcode = sys.argv[1]
-mutFile = sys.argv[2]
-bamDir = sys.argv[3]
-umiDir = sys.argv[4]
+plan = sys.argv[1]
+barcode = sys.argv[2]
+mutFile = sys.argv[3]
+bamDir = sys.argv[4]
+umiDir = sys.argv[5]
+if plan == "BP":
+    umiDir = None
 # Output
-csvDir = sys.argv[5]
+csvDir = sys.argv[-1]
 
 mutObj = MutMatrix(mutFile)
 # Read mutation table as updated matrix
@@ -292,7 +297,9 @@ for spl in range(sample):
         continue
 
     # Load UMI fastq file
-    seqRoster = umi_roster(os.path.join(umiDir, str(spl) + ".fq"))
+    seqRoster = None
+    if plan == "iBP":
+        seqRoster = umi_roster(os.path.join(umiDir, str(spl) + ".fq"))
     for mutArr in mutMat:
         # Sequentially check each key of loci
         location = "_".join(mutArr)
@@ -325,6 +332,9 @@ for spl in range(sample):
             if mutSeq == vcfAlt:
                 mutState = 1
 
+            if plan == "BP":
+                umiPanel[mutState].append(mutSeq)
+                continue
             """ UMI deduplication.
             """
             umiSeq = seqRoster[seg.query_name]

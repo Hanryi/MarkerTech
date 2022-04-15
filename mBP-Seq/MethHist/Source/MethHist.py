@@ -5,7 +5,7 @@ Created on March 13, 2022
 Han Rui (154702913@qq.com)
 
 @Usage
-> python3 MethHist.py <meth.csv> <o_FencePlot.png>
+> python3 MethHist.py <meth.csv> <o_FencePlot.d>
 # <meth.csv>: a sorted table (by chr and pos), its header containing
 #             (Chr, Pos, Context, C, C+T, Active)
 #             1. Chr: chromosome name
@@ -14,8 +14,8 @@ Han Rui (154702913@qq.com)
 #             4. C: unique cytosine
 #             5. C+T: sum of unique thymine and cytosine
 #             6. Active: active fraction
-# <o_FencePlot.png>: a directory using to save fence plot figure
-#                    (Fence Plot: named by @Author)
+# <o_FencePlot.d>: a directory using to save fence plot figure
+#                  (Fence Plot: named by @Author)
 
 @Function
 Convert a large amount of position and methylation active information in the
@@ -105,10 +105,18 @@ class FencePlot(MethData):
     dpi = 600
     single_void = 25
     sub_axis_level = -0.025
+    pillar_width = 2
+    # Font size
+    endpoint_size = 10
+    chr_name_size = 15
+    act_name_size = 15
+    # Font family
+    base_font = 'FangSong'
+    demo_font = 'Times New Roman'
 
     def __init__(self, filepath: str):
         # Allow Chinese and negative sign
-        plt.rcParams['font.sans-serif'] = ['FangSong']
+        plt.rcParams['font.sans-serif'] = [self.base_font]
         plt.rcParams['axes.unicode_minus'] = False
 
         def step(start, length):
@@ -186,14 +194,14 @@ class FencePlot(MethData):
             )
             plt.text(
                 getattr(self, self.inr_pref + ch)[0], -0.05,
-                getattr(self, self.inr_pref + ch)[0], size=5,
+                getattr(self, self.inr_pref + ch)[0], size=self.endpoint_size,
                 horizontalalignment='center', verticalalignment='top',
                 color=self.fence_color()[self.chromosome.index(ch)],
                 bbox=dict(facecolor="white", alpha=0)
             )
             plt.text(
                 getattr(self, self.inr_pref + ch)[1], -0.05,
-                getattr(self, self.inr_pref + ch)[1], size=5,
+                getattr(self, self.inr_pref + ch)[1], size=self.endpoint_size,
                 horizontalalignment='center', verticalalignment='top',
                 color=self.fence_color()[self.chromosome.index(ch)],
                 bbox=dict(facecolor="white", alpha=0)
@@ -208,14 +216,14 @@ class FencePlot(MethData):
                                 p[0] - getattr(self, self.lim_pref + ch)[0]
                         )
                     ] * 2, [0, p[1]],
-                    linewidth=1,
+                    linewidth=self.pillar_width, alpha=0.75,
                     color=self.fence_color()[self.chromosome.index(ch)]
                 )
             # Chromosome name annotation
             plt.text(
                 sum(getattr(self, self.inr_pref + ch)) / 2, -0.1, ch,
                 horizontalalignment='center', verticalalignment='top',
-                bbox=dict(facecolor="white", alpha=0)
+                bbox=dict(facecolor="white", alpha=0), size=self.chr_name_size
             )
         return None
 
@@ -226,13 +234,20 @@ if __name__ == "__main__":
 
     # Figure size and subplot spacing
     fig = plt.figure(
-        figsize=(fenceObj.x_max_value / 1000 * 8, 3 * len(context))
+        figsize=(fenceObj.x_max_value / 1000 * 16, 4 * len(context))
     )
-    fig.subplots_adjust(hspace=0.2, wspace=0)
+    fig.subplots_adjust(hspace=0.25, wspace=0)
     # Plot fence plots
     for n in range(1, len(context) + 1):
         ax = fig.add_subplot(len(context), 1, n)
-        ax.set_ylabel(context[n - 1] + ' Active')
+        ax.set_ylabel(
+            context[n - 1] + ' Active',
+            fontdict=dict(
+                fontsize=fenceObj.act_name_size,
+                family=fenceObj.demo_font,
+                weight='bold'
+            )
+        )
         fenceObj.active_hist(ax, fenceObj.meth_data[context[n - 1]])
 
     plt.savefig(
