@@ -47,7 +47,7 @@ def generate_triple(tab_path):
     meth_tab = open(tab_path)
     next(meth_tab)
     for line in meth_tab:
-        meth_record = line.split("\t", 4)
+        meth_record = line.strip().split("\t", 4)
         yield [meth_record[0], meth_record[1], meth_record[3]]
     meth_tab.close()
 
