@@ -331,7 +331,7 @@ for i in emptySpl:
 
     # Output UMI sequence for iBP and mBP
     if umiDir is None:
-        break
+        continue
     emptyUMI = open(os.path.join(umiDir, str(i) + ".fq"), 'a')
     emptyUMI.close()
 
