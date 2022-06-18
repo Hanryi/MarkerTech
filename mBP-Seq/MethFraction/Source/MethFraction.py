@@ -136,7 +136,7 @@ triple = generate_triple(sys.argv[3])
 
 # Output arg
 separator = ","
-header = ["Chr", "Pos", "Context", "C", "C+T", "Active"]
+header = ["chr", "pos", "context", "C_count", "CT_count", "ratio"]
 with open(sys.argv[4], 'w') as methActiveTab:
     methActiveTab.write(separator.join(header) + "\n")
 
