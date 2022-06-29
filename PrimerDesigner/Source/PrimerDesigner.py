@@ -15,7 +15,6 @@ Han Rui (154702913@qq.com)
 Design specific primers in batches for BP-Seq and iBP-Seq
 """
 
-import os
 import sys
 
 import primer3
@@ -39,16 +38,17 @@ def primer_attr_matrix(temp_name, temp_seq, keep_area, len_arr, melt_arr):
     :return: List
         main attrs of one pair of primers
     """
-    # Constant length value (118 = 150 - 32)
+    # Constant length value (iBP: 118 = 150 - 32, BP: 36 = 150 - 114)
     left_primer_area_length = 150
     right_primer_area_length = 118
+    if strategy == 2:
+        right_primer_area_length = 36
 
     # Select start index
     left_primer_start = max(
         keep_area[1] - left_primer_area_length,
         0,
     )
-    # right_primer_end = min()
     right_primer_start = min(
         keep_area[0] - 2 + right_primer_area_length,
         len(tempSeq) - 1,
@@ -152,7 +152,7 @@ strategy = eval(sys.argv[1])
 lenArr = list(map(int, sys.argv[4: 10]))
 meltArr = list(map(float, sys.argv[10:]))
 
-# Result of primer design
+# Add header of primer result
 primerAttrMat = []
 attrName = [
     'Name',
@@ -165,70 +165,66 @@ attrName = [
 ]
 primerAttrMat.append(attrName)
 
-# Specific sequence in 5'pos
+# Different variable
 BRIDGE = "ATAGCGACGCGTTTCAAC"
 sheetName = 'iBP-Primers'
 if strategy == 3:
+    for product in range(3, 6):
+        lenArr[product] -= 32
     BRIDGE += "NNNNNN"
 if strategy == 2:
+    for product in range(3, 6):
+        lenArr[product] -= 114
     sheetName = 'BP-Primers'
 
-# Init container globally
+# Init
 tempName = ''
 keepArea = []
 tempSeq = ''
 
 tempFile = open(tempTxt)
-
 for line in tempFile:
+    # Attach sequence based on valid header
     if line[0] != '>':
-        """ Attach sequence behind valid header.
-        """
         if tempName != '' and keepArea != [] and keepArea[0] <= keepArea[1]:
             tempSeq += line.strip()
-        # Move to next line finally
         continue
 
     if len(tempSeq) >= 150 and len(tempSeq) >= keepArea[1]:
-        """ Design primer for previous valid record.
-        """
+        # Design primer for previous valid record
         mainAttr = primer_attr_matrix(
             tempName, tempSeq, keepArea, lenArr, meltArr
         )
         primerAttrMat.append(mainAttr)
 
-    # Init current container
+    # Entry point
     tempName = ''
     keepArea = []
     tempSeq = ''
 
-    # Read current header
+    # Description line
     headerVec = line[1:].strip().split('|')
     if len(headerVec) >= 2:
-        """ Sequence name.
-        """
+        # Sequence name
         tempName = headerVec[0].strip()
 
-        # Check the format of '-'
+        # Area annotation
         note = headerVec[1].replace(' ', '')
         if note == '' or note.count('-') > 1 or '-' in [note[0], note[-1]]:
             continue
-
-        """ Area annotation.
-        """
         keepArea = [int(i) for i in note.split('-')]
 
-        # Expand single base interval makes all len == 2
+        # Expand the single base position to a interval
         if len(keepArea) == 1:
             keepArea.append(keepArea[0])
-
 tempFile.close()
 
 # Pick primer for the last sequence
-mainAttr = primer_attr_matrix(
-    tempName, tempSeq, keepArea, lenArr, meltArr
-)
-primerAttrMat.append(mainAttr)
+if len(tempSeq) >= 150 and len(tempSeq) >= keepArea[1]:
+    mainAttr = primer_attr_matrix(
+        tempName, tempSeq, keepArea, lenArr, meltArr
+    )
+    primerAttrMat.append(mainAttr)
 
 # Export dataframe as excel
 primerAttrFrame = pd.DataFrame(primerAttrMat)

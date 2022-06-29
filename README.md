@@ -224,7 +224,7 @@ for i in $(ls -d ref/*);do bismark_genome_preparation ${i}/ ;done
 ##### Alignment
 
 ~~~shell
-for ((f=0; f<$(ls -l fq | grep "_1.fq$" | wc -l); f++)); do lineage=$(sed -n $[${f}+1]p barcode/<barcode>.txt | sed "s/.*,//" | sed "s/\r//" | sed "s/\//_/g");bismark -N 0 -L 20 --bowtie2 --non_bs_mm /<abs_path>/ref/${lineage}/ --sam -o sam/ --q -1 fq/${f}_1.fq -2 fq/${f}_2.fq; done
+for ((f=0; f<$(ls -l fq | grep "_1.fq$" | wc -l); f++)); do ref_name=$(sed -n $[${f}+1]p barcode/<barcode>.txt | sed "s/.*,//" | sed "s/\r//"); lineage=$(python3 -c "print('/'.join(sorted('${ref_name}'.split('/'))))" | sed "s/\//_/g"); bismark -N 0 -L 20 --bowtie2 --non_bs_mm /<abs_path>/ref/"${lineage}"/ --sam -o sam/ --q -1 fq/${f}_1.fq -2 fq/${f}_2.fq; done
 ~~~
 
 #### SAM processing
