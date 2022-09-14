@@ -1,8 +1,8 @@
 # Marker Tech
 
-[![platform](https://img.shields.io/badge/platform-Website-blue)](http://zeasystemsbio.hzau.edu.cn:8080/) [![copyright](https://img.shields.io/badge/copyright-LiLab-%23298850)](https://faculty.hzau.edu.cn/lilin12/zh_CN/index.htm) [![doc](https://img.shields.io/badge/doc-Primer-red)](https://github.com/9-34platform/MarkerTech/blob/master/PrimerDesigner/引物设计开发文档.md) [![doc](https://img.shields.io/static/v1?label=doc&message=iBP-Seq&color=red)](https://github.com/9-34platform/MarkerTech/blob/master/iBP-Seq/iBP-Seq%20开发文档.md) 
+[![platform](https://img.shields.io/badge/platform-Website-blue)](http://zeasystemsbio.hzau.edu.cn:8080/) [![copyright](https://img.shields.io/badge/copyright-LiLab-%23298850)](https://faculty.hzau.edu.cn/lilin12/zh_CN/index.htm) [![doc](https://img.shields.io/badge/doc-Primer-red)](https://github.com/9-34platform/MarkerTech/blob/master/PrimerDesigner/引物设计开发文档.md) [![doc](https://img.shields.io/static/v1?label=doc&message=iBP-seq&color=red)](https://github.com/9-34platform/MarkerTech/blob/master/iBP-Seq/iBP-Seq%20开发文档.md) 
 
-A cost-saving genotyping pattern based on the next-generation sequencing (NGS) technology. We also build an online analysis system which provides several services for using the technology in an easier way. However, in order to meet diverse and highly customized needs, the main source codes are provided for users to modify as needed. The services we provide include primer design service and iBP-Seq (improved Bulked-PCR Seq) analysis service which can do both genotyping and methylation typing. The primer design service generates special primer sequences flanking the maker for each template sequence. The NGS data for the sequence analysis service should be generate by using the primer design service. 
+A cost-saving genotyping pattern based on the next-generation sequencing (NGS) technology. We also build an online analysis system which provides several services for using the technology in an easier way. However, in order to meet diverse and highly customized needs, the main source codes are provided for users to modify as needed. The services we provide include primer design service and iBP-seq (improved Bulked-PCR Seq) analysis service which can do both genotyping and methylation typing. The primer design service generates special primer sequences flanking the maker for each template sequence. The NGS data for the sequence analysis service should be generate by using the primer design service. 
 
 ## Preparation
 
@@ -14,11 +14,11 @@ A cost-saving genotyping pattern based on the next-generation sequencing (NGS) t
 3. **Data**
    - a template sequence file in fasta format containing template sequences (header format: \>Name|301-304; Sequence length>=601)
 
-### BP-Seq & iBP-Seq analysis
+### BP-seq & iBP-seq (genotyping) analysis
 
 Due to the limitation of some modules, such as pysam, we recommend running these main codes on a Linux operating system when you call them from the command line. 
 
-Both the genotyping service for iBP-Seq and methylation typing service require these configurations: 
+Both the genotyping service for iBP-seq and methylation typing service require these configurations: 
 
 1. **Environment**
    - python>=3.6.0
@@ -39,7 +39,7 @@ Both the genotyping service for iBP-Seq and methylation typing service require t
    - a mutation table with header include four columns (CHROM, POS, REF, ALT)
    - **optional**: a reference sequence file in fasta format 
 
-### mBP-Seq analysis
+### iBP-seq (epigenotyping) analysis
 
 1. **Environment**
    - python>=3.6.0
@@ -87,7 +87,7 @@ mkdir qc fq umi sam bam csv xlsx png
 
 ### Primer design
 
-The input parameters of PrimerDesigner.py are: strategy number (BP-Seq: 2; iBP-Seq: 3), input template file, file name (including .xlsx suffix), shortest primer length, optimal primer length, longest primer length, shortest amplicon length, optimal amplicon length, longest amplicon length, minimum Tm of primer, optimal Tm of primer, maximum Tm of primer. 
+The input parameters of PrimerDesigner.py are: strategy number (BP-seq: 2; iBP-seq: 3), input template file, file name (including .xlsx suffix), shortest primer length, optimal primer length, longest primer length, shortest amplicon length, optimal amplicon length, longest amplicon length, minimum Tm of primer, optimal Tm of primer, maximum Tm of primer. 
 
 An example of the command line is as follows: 
 
@@ -95,7 +95,7 @@ An example of the command line is as follows:
 python3 PrimerDesigner.py 3 testSeq.fa ./filename.xlsx 18 20 25 280 286 320 50 60 65
 ~~~
 
-### BP-Seq analysis
+### BP-seq analysis
 
 > A pipeline for the base genotyping strategy. 
 
@@ -145,9 +145,9 @@ Identify different genotypes or methylation types by the minimum point of kernel
 for t in $(ls csv/*); do python3.7 Minima.py ${t} xlsx png; done
 ~~~
 
-### iBP-Seq analysis
+### iBP-seq (genotyping) analysis
 
-> A pipeline for an improved solution based on BP-Seq.
+> A pipeline for an improved solution based on BP-seq.
 
 #### Quality control
 
@@ -195,9 +195,9 @@ Identify different genotypes or methylation types by the minimum point of kernel
 for t in $(ls csv/*); do python3.7 Minima.py ${t} xlsx png; done
 ~~~
 
-### mBP-Seq analysis
+### iBP-seq (epigenotyping) analysis
 
-> This pipeline is an application of iBP-Seq method in processing methylation data. 
+> This pipeline is an application of iBP-seq (genotyping) method in processing methylation data. 
 
 #### Quality control
 

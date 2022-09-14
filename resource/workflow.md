@@ -1,6 +1,6 @@
 # Workflow (2022.04.16)
 
-## BP
+## BP-seq
 
 **输入**：一对 fq 文件 (fastq.fq) 、barcode 文本文件 (barcode.txt) 、选择或上传参考序列 (Reference) 、突变位点文件 (mutation.csv)
 
@@ -62,7 +62,7 @@ flowchart TB
     Mpy --> Mxlsx --> result((Genotype)):::endPoint
 ~~~
 
-## iBP
+## iBP-seq (genotyping)
 
 **输入**：一对 fq 文件 (fastq.fq) 、barcode 文本文件 (barcode.txt) 、选择或上传参考序列 (Reference) 、突变位点文件 (mutation.csv)
 
@@ -126,7 +126,7 @@ flowchart TB
     Mpy --> Mxlsx --> result((Genotype)):::endPoint
 ~~~
 
-## mBP
+## iBP-seq (epigenotyping)
 
 **输入**：一对 fq 文件 (fastq.fq) 、barcode 文本文件 (barcode.txt) 、选择或上传参考序列 (Reference) 
 
@@ -221,6 +221,6 @@ flowchart TB
     Mcsv[[markers.csv]] --> MethHist --> Mpng[[active.png]]
     Mpng[[active.png]] --> result((epi-Genotype)):::endPoint
     Mcsv[[markers.csv]] --> result((epi-Genotype)):::endPoint
-    result((epi-Genotype)):::endPoint
+    result((Epigenotype)):::endPoint
 ~~~
 
